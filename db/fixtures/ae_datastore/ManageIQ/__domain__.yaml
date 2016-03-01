@@ -6,6 +6,7 @@ object:
     name: ManageIQ
     description: Base domain
     display_name: 
-    system: true
+    system: false
     priority: 0
     enabled: true
+    tenant_id: 1
