@@ -1,93 +1,70 @@
-require 'net/ssh'
-
 LOCAL_BOOK = 'local_book.yaml'.freeze
-REPO_URL = "https://copr.fedorainfracloud.org/coprs/maxamillion/origin-next/repo/epel-7/maxamillion-origin-next-epel-7.repo".freeze
+REPO_URL   = "https://copr.fedorainfracloud.org/coprs/maxamillion/origin-next/repo/epel-7/maxamillion-origin-next-epel-7.repo".freeze
 
 def handle_rhel_subscriptions(commands)
-  system "scp -o 'StrictHostKeyChecking no' rhel_subscribe_inventory.yaml " \
-    "#{$evm.root['user']}@#{$evm.root['deployment_master']}:~/"
-  rhel_subscribe_cmd = "ansible-playbook /usr/share/ansible/openshift-ansible/playbooks/byo/rhel_subscribe.yml -i "\
-                       "/usr/share/ansible/openshift-ansible/rhel_subscribe_inventory.yaml"
-  commands.push("sudo mv ~/rhel_subscribe_inventory.yaml /usr/share/ansible/openshift-ansible/", rhel_subscribe_cmd)
-end
+  commands.unshift("sudo subscription-manager repos --disable=\"*\"",
+                   "sudo subscription-manager repos --enable=\"rhel-7-server-rh-common-rpms\" --enable=\"rhel-7-server-rpms\" --enable=\"rhel-7-server-extras-rpms\" --enable=\"rhel-7-server-ose-3.2-rpms\"")
+  $evm.root['container_deployment'].perform_scp($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), "rhel_subscribe_inventory.yaml", "rhel_subscribe_inventory.yaml")
 
-def ssh_exec!(ssh, command)
-  stdout_data, stderr_data = "", ""
-  exit_code, exit_signal = nil, nil
-
-  ssh.open_channel do |channel|
-    channel.exec("ssh -A -o 'StrictHostKeyChecking no' -t -t #{$evm.root['user']}@#{$evm.root['deployment_master']} " \
-                 + command) do |_, success|
-      raise StandardError, "Command \"#{command}\" was unable to execute" unless success
-
-      channel.on_data do |_, data|
-        stdout_data += data
-      end
-
-      channel.on_extended_data do |_, _, data|
-        stderr_data += data
-      end
-
-      channel.on_request("exit-status") do |_, data|
-        exit_code = data.read_long
-      end
-
-      channel.on_request("exit-signal") do |_, data|
-        exit_signal = data.read_long
-      end
-    end
-  end
-  ssh.loop
-  {
-    :stdout      => stdout_data,
-    :stderr      => stderr_data,
-    :exit_code   => exit_code,
-    :exit_signal => exit_signal
-  }
+  commands.push("sudo mv ~/rhel_subscribe_inventory.yaml /usr/share/ansible/openshift-ansible/") if $evm.vmdb(:container_deployment).find($evm.root['automation_task'].automation_request.options[:attrs][:deployment_id]). container_deployment_nodes.count > 1
+  commands
 end
 
 def pre_deployment
-  commands = ['sudo yum install -y ansible',
+  commands = ['sudo yum install -y ansible-1.9.4',
               'sudo yum install -y openshift-ansible openshift-ansible-playbooks pyOpenSSL',
-              "sudo mv ~/inventory.yaml /usr/share/ansible/openshift-ansible/"
-              ]
+              "sudo mv ~/inventory.yaml /usr/share/ansible/openshift-ansible/",
+              "sudo yum install -y atomic-openshift-utils"
+  ]
   $evm.log(:info, "********************** #{$evm.root['ae_state']} ***************************")
-  begin
-    Net::SSH.start($evm.root['deployment_master'], $evm.root['user'], :paranoid => false, :forward_agent => true,
-                   :key_data => $evm.root['private_key']) do |ssh|
-      $evm.log(:info, "Connected to deployment master, ip address: #{$evm.root['deployment_master']}")
-      system "scp -o 'StrictHostKeyChecking no' inventory.yaml #{$evm.root['user']}@#{$evm.root['deployment_master']}:~/"
-      failed_execute = false
-      release = ssh.exec!("cat /etc/redhat-release")
-      if release.include?("CentOS")
-        commands.unshift("sudo yum install epel-release -y",
-                         "sudo curl -o /etc/yum.repos.d/maxamillion-origin-next-epel-7.repo #{REPO_URL}")
-      elsif release.include?("Red Hat Enterprise Linux") &&
-            !$evm.root['automation_task'].automation_request.options[:attrs][:containerized]
-        commands = handle_rhel_subscriptions(commands)
-      end
-      commands.each do |cmd|
-        result = ssh_exec!(ssh, cmd)
-        unless result[:exit_code] == 0
-          $evm.root['automation_task'].message = "FAILED: couldn't execute command #{cmd}. ERROR: #{result[:stderr]}"
-          $evm.root['ae_result'] = "error"
-          failed_execute = true
-        end
-        break if failed_execute
-      end
-      unless failed_execute
-        $evm.root['ae_result'] = "ok"
-        $evm.root['automation_task'].message = "successful pre-deployment"
-      end
-    end
-  rescue
-    $evm.root['ae_result'] = "error"
-    $evm.root['automation_task'].message = "Cannot connect to deployment master " \
-                                           "(#{$evm.root['deployment_master']}) via ssh"
-  ensure
-    $evm.log(:info, "State: #{$evm.root['ae_state']} | Result: #{$evm.root['ae_result']} "\
-             "| Message: #{$evm.root['automation_task'].message}")
+  $evm.root['container_deployment'].perform_scp($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), "inventory.yaml", "inventory.yaml")
+  release = $evm.root['container_deployment'].perform_agent_commands($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), ["sudo cat /etc/redhat-release"])[:stdout]
+  if release.include?("CentOS")
+    commands.unshift("sudo yum install epel-release -y",
+                     "sudo curl -o /etc/yum.repos.d/maxamillion-origin-next-epel-7.repo #{REPO_URL}")
+  elsif release.include?("Red Hat Enterprise Linux") &&
+        !$evm.root['automation_task'].automation_request.options[:attrs][:containerized]
+    commands = handle_rhel_subscriptions(commands)
+    $evm.root['rhsub_user'], $evm.root['rhsub_pass'] = $evm.root['container_deployment'].rhsm_creds
+    $evm.root['rhsub_pool'] = $evm.root['automation_task'].automation_request.options[:attrs][:rhsub_sku]
+
+    $evm.root['container_deployment'].perform_agent_commands($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), ["sudo subscription-manager register --username='#{$evm.root['rhsub_user']}'  --password='#{$evm.root['rhsub_pass']}'"])
+    pool_id = $evm.root['container_deployment'].perform_agent_commands($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), ["sudo subscription-manager list --available --matches=#{$evm.root['rhsub_pool']} --pool-only"])[:stdout].split("\n").first.delete("\r")
+    $evm.root['container_deployment'].perform_agent_commands($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), ["sudo subscription-manager attach --pool=#{pool_id}"])
+  end
+  $evm.root['container_deployment'].perform_agent_commands($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), commands)
+  if commands.include?("sudo mv ~/rhel_subscribe_inventory.yaml /usr/share/ansible/openshift-ansible/")
+    rhel_subscribe_cmd = "ansible-playbook /usr/share/ansible/openshift-ansible/playbooks/byo/rhel_subscribe.yml -i "\
+                       "/usr/share/ansible/openshift-ansible/rhel_subscribe_inventory.yaml 1> /tmp/ansible.log 2> /tmp/openshift-ansible.log.2 < /dev/null"
+    $evm.root['container_deployment'].run_playbook_command($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), rhel_subscribe_cmd)
+    $evm.root['ae_result']         = 'retry'
+    $evm.root['ae_retry_interval'] = '1.minute'
+  else
+    $evm.root['ae_result']               = "ok"
+    $evm.root['automation_task'].message = "#{$evm.root['ae_state']} was finished successfully"
   end
 end
 
-pre_deployment
+begin
+  $evm.root['container_deployment'] = $evm.vmdb(:container_deployment).find(
+    $evm.root['automation_task'].automation_request.options[:attrs][:deployment_id]) unless $evm.root['container_deployment']
+  if $evm.root['container_deployment'].playbook_running?
+    rhel_subscribe_cmd = "ansible-playbook /usr/share/ansible/openshift-ansible/playbooks/byo/rhel_subscribe.yml -i "\
+                        "/usr/share/ansible/openshift-ansible/rhel_subscribe_inventory.yaml 1> /tmp/ansible.log 2> /tmp/openshift-ansible.log.2 < /dev/null"
+    result = $evm.root['container_deployment'].run_playbook_command($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), rhel_subscribe_cmd)
+    if result[:finished]
+      $evm.root['ae_result'] = $evm.root['container_deployment'].analyze_ansible_output(result[:stdout]) ? "ok" : "error"
+    else
+      $evm.log(:info, "*********  pre-deployment playbook is runing waiting for it to finish ************")
+      $evm.root['ae_result']         = 'retry'
+      $evm.root['ae_retry_interval'] = '1.minute'
+    end
+  else
+    pre_deployment
+  end
+rescue => err
+  $evm.log(:error, "[#{err}]\n#{err.backtrace.join("\n")}")
+  $evm.root['ae_result'] = 'error'
+  $evm.root['ae_reason'] = "Error: #{err.message}"
+  exit MIQ_ERROR
+end
