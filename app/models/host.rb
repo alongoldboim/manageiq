@@ -794,6 +794,7 @@ class Host < ApplicationRecord
   end
 
   def verify_credentials_with_ssh(auth_type = nil, options = {})
+    byebug
     raise MiqException::MiqHostError, _("No credentials defined") if missing_credentials?(auth_type)
     unless os_image_name =~ /linux_*/
       raise MiqException::MiqHostError, _("Logon to platform [%{os_name}] not supported") % {:os_name => os_image_name}
