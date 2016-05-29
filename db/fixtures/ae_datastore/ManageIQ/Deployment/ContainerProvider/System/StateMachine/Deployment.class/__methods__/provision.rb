@@ -52,7 +52,7 @@ def provision_request(vm_attr, type)
   create_provision_requests(args[2]['vm_name'], num_of_vms, args, type)
 end
 
-def start_provisioing
+def start_provisioning
   $evm.log(:info, '*********  starting provision  ************')
   provision_request($evm.root['automation_task'].automation_request.options[:attrs][:nodes_provision], "node")
   provision_request($evm.root['automation_task'].automation_request.options[:attrs][:masters_provision], "master")
@@ -67,7 +67,7 @@ def provision
   $evm.root['state']                   = "provision"
   $evm.root['automation_task'].message = "Provisioning"
   $evm.log(:info, "********************** provision ***************************")
-  start_provisioing if tasks.empty?
+  start_provisioning if tasks.empty?
   number_of_finished_vms = 0
   fail                   = false
   $evm.log(:info, '*********  checking state of machines   ************')
