@@ -5,6 +5,21 @@
 :identifier: everything
 :children:
 
+# Container Deployment Create
+- :name: Container Deployment
+  :description: Container Deployment
+  :feature_type: node
+  :identifier: container_deployment
+  :children:
+  - name: Container Deployment Create
+    :description: Container Deployment Create
+    :feature_type: node
+    :identifier: container_deployment_create
+  - :name: Container Deployment Show
+    :description:  Container Deployment Show
+    :feature_type: node
+    :identifier: container_deployment_show
+
 # Workloads Explorer
 - :name: Workloads
   :description: Workloads Views
