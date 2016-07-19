@@ -22,7 +22,7 @@ module MiqAeMethodService
     end
 
     def regenerate_ansible_inventory
-      object_send(:generate_ansible_inventory)
+      object_send(:generate_ansible_yaml)
     end
 
     def regenerate_ansible_subscription_inventory

@@ -235,8 +235,6 @@ eos
         :deployment_master        => roles_addresses("deployment_master"),
         :masters                  => roles_addresses("master"),
         :nodes                    => roles_addresses("node"),
-        :inventory                => generate_ansible_inventory,
-        :rhel_subscribe_inventory => generate_ansible_inventory_for_subscription,
       }
       parameters.merge parameters_existing
     end
