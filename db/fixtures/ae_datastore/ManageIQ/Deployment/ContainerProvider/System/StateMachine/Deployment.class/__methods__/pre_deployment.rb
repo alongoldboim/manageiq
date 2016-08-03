@@ -21,7 +21,8 @@ def pre_deployment
   release = $evm.root['container_deployment'].perform_agent_commands($evm.root['deployment_master'], $evm.get_state_var(:ssh_user), ["sudo cat /etc/redhat-release"])[:stdout]
   if release.include?("CentOS")
     commands.unshift("sudo yum install epel-release -y",
-                     "sudo curl -o /etc/yum.repos.d/maxamillion-origin-next-epel-7.repo #{REPO_URL}")
+                     "sudo curl -o /etc/yum.repos.d/maxamillion-origin-next-epel-7.repo #{REPO_URL}",
+                     "sudo yum install centos-release-paas-common centos-release-openshift-origin -y")
   elsif release.include?("Red Hat Enterprise Linux") &&
         !$evm.root['automation_task'].automation_request.options[:attrs][:containerized]
     commands = handle_rhel_subscriptions(commands)
