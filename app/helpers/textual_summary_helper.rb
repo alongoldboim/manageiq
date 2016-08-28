@@ -107,8 +107,13 @@ module TextualSummaryHelper
     label ||= ui_lookup(:models => klass.name)
     image = textual_collection_icon(collection, klass)
     count = collection.count
+    value = if block_given?
+      yield count
+    else
+      count
+    end
 
-    h = {:label => label, :image => image, :value => count.to_s}
+    h = {:label => label, :image => image, :value => value.to_s}
 
     if count > 0 && role_allows?(:feature => feature)
       if link

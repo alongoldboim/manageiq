@@ -3282,6 +3282,10 @@
           :description: Container Deployment Create
           :feature_type: control
           :identifier: container_deployment_create
+        - :name: Container Deployment As Template
+          :description: Container Deployment As Template
+          :feature_type: control
+          :identifier: create_template
   - :name: Modify
     :description: Modify Containers Providers
     :feature_type: admin

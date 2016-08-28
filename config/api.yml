@@ -208,6 +208,8 @@
       :post:
       - :name: create
         :identifier: container_deployment_create
+      - :name: add_template
+        :identifier: create_template
     :resource_actions:
       :get:
       - :name: read

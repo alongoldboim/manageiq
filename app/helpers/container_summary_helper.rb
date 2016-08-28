@@ -46,7 +46,12 @@ module ContainerSummaryHelper
   end
 
   def textual_container_nodes
-    textual_link(@record.container_nodes)
+    textual_link(@record.container_nodes) do |count|
+      expected_nodes = @record.container_deployments.first.customizations[:container_nodes]
+      return count if expected_nodes == count
+      diff = expected_nodes > count ? count - expected_nodes : expected_nodes - count
+      count.to_s + " (" + diff.to_s + ")"
+    end
   end
 
   def textual_container_node

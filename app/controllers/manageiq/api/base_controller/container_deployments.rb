@@ -15,6 +15,13 @@ module ManageIQ
           deployment = ContainerDeployment.new
           deployment.create_deployment(data, @auth_user_obj)
         end
+
+        def add_template_resource_container_deployments(_type, _id, data)
+          provider = ExtManagementSystem.find_by_name(data.delete("name"))
+          provider.container_deployments.destroy_all
+          deployment = ContainerDeployment.create(:customizations => data.symbolize_keys)
+          provider.container_deployments << deployment
+        end
       end
     end
   end
