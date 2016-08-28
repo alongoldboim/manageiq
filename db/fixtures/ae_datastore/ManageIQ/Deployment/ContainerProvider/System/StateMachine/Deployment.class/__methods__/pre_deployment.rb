@@ -3,6 +3,14 @@ REPO_URL   = "https://copr.fedorainfracloud.org/coprs/maxamillion/origin-next/re
 INVENTORY_FILE = 'inventory.yaml'.freeze
 RHEL_SUBSCRIBE_INVENTORY = 'rhel_subscribe_inventory.yaml'.freeze
 
+def create_puddle_repo
+  File.open("temp.repo", "w") do |f|
+    f.write("[temp]\nname=alontemp\nbaseurl=http://download.lab.bos.redhat.com/rcm-guest/puddles/RHAOS/AtomicOpenShift/3.2/2016-08-04.1/x86_64/os\nenabled=1\ngpgcheck=0")
+  end
+  $evm.root['container_deployment'].perform_scp("temp.repo", "temp.repo")
+  $evm.root['container_deployment'].perform_agent_commands(["sudo mv ~/temp.repo /etc/yum.repos.d/temp.repo"])
+end
+
 def pre_deployment(deployment)
   $evm.log(:info, "********************** #{$evm.root['ae_state']} ***************************")
   $evm.root['inventory'] = $evm.root['container_deployment'].generate_ansible_yaml
@@ -21,6 +29,7 @@ def pre_deployment(deployment)
                      "sudo yum install centos-release-paas-common centos-release-openshift-origin -y")
   elsif release.include?("Red Hat Enterprise Linux")
     deployment.subscribe_deployment_master
+    create_puddle_repo
   end
   deployment.perform_agent_commands(commands)
   if release.include?("Red Hat Enterprise Linux") && deployment.nodes_subscription_needed?

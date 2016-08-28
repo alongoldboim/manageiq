@@ -95,8 +95,11 @@ EOS
       "ansible_inventory_path" => ANSIBLE_CONFIG_INVENTORY_PATH,
       "deployment"             => {
         "ansible_ssh_user" => ssh_auth.userid,
-        "hosts"            => container_deployment_nodes.collect(&:to_ansible_config_format),
-        "roles"            => generate_roles
+        "hosts" => container_deployment_nodes.collect(&:to_ansible_config_format),
+        "roles" => generate_roles,
+        "openshift_docker_additional_registries" => "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888",
+        "openshift_docker_insecure_registries" => "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888",
+        "openshift_additional_repos" =>  "[{'id': 'ose-devel', 'name': 'ose-devel', 'baseurl': 'http://download.lab.bos.redhat.com/rcm-guest/puddles/RHAOS/AtomicOpenShift/3.2/2016-08-04.1/x86_64/os', 'enabled': 1, 'gpgcheck': 0}]"
       },
       "version"                => version,
       "variant_version"        => kind.include?("origin") ? '1.2' : '3.2',
