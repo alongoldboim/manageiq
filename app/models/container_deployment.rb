@@ -95,6 +95,8 @@ EOS
       "ansible_inventory_path" => ANSIBLE_CONFIG_INVENTORY_PATH,
       "deployment"             => {
         "ansible_ssh_user" => ssh_auth.userid,
+        "openshift_docker_additional_registries" => "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888",
+        "openshift_docker_insecure_registries" => "brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888",
         "hosts"            => container_deployment_nodes.collect(&:to_ansible_config_format),
         "roles"            => generate_roles
       },
