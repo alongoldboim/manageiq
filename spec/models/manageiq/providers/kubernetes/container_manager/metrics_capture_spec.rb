@@ -137,9 +137,11 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCapture do
         exercise[:gauges].each do |metrics|
           allow_any_instance_of(described_class::CaptureContext)
             .to receive(:fetch_gauges_data)
-            .with("machine/node/#{metrics[:args]}")
-            .and_return(metrics[:data])
+                  .with("machine/node/#{metrics[:args]}")
+                  .and_return(metrics[:data])
         end
+
+        allow_any_instance_of(described_class::CaptureContext).to receive(:fetch_strings_keys).and_return([])
 
         _, values_by_ts = @node.perf_collect_metrics('realtime')
 
